@@ -4,48 +4,14 @@
 # SPDX-License-Identifier: MIT
 
 __cobalt_spark_pwd_prompt_info() {
-  if [[ "$PWD" == "/" ]]; then
-    print -r -- "/"
-    return
-  fi
-
-  # The D flag abbreviates both home and zsh named directories.
-  local abbreviated="${(D)PWD}"
-
-  if [[ "$abbreviated" == '~'* && "$abbreviated" != */* ]]; then
-    print -r -- "${abbreviated//\%/%%}"
-    return
-  fi
-
-  local base="${PWD:t}"
-  local cap=${COBALT_SPARK_THEME_PARENT_CAP:-5}
-
-  [[ "$cap" == <-> ]] || cap=5
-
-  if (( cap < 1 )); then
-    print -r -- "${base//\%/%%}"
-    return
-  fi
-
-  local parent_dir="${abbreviated:h}"
-
-  if [[ "$parent_dir" == '~'* && "$parent_dir" != */* ]]; then
-    (( ++cap ))
-  fi
-
-  local parent="${parent_dir:t}"
-
-  # Abbreviate only when the parent name exceeds the cap by at least three
-  # characters. This policy was chosen after careful consideration.
-  if (( ${#parent} > cap + 2 )); then
-    parent="${parent[1,cap]}[…]"
-  fi
-
-  case "${parent_dir:h}" in
-    "~") parent="~/${parent}" ;;
-    /) [[ "$parent_dir" != "/" ]] && parent="/${parent}" ;;
+  # [Fork 定制] 显示完整路径（原版只显示“父目录/当前目录”）
+  local abbreviated="${(D)PWD}" parent base
+  case "$abbreviated" in
+    /) print -r -- "/"; return ;;
+    '~') print -r -- "%F{75}~%f"; return ;;
   esac
-
+  parent="${abbreviated:h}"
+  base="${abbreviated:t}"
   print -r -- "%F{67}${parent//\%/%%}%F{75}/${base//\%/%%}"
 }
 
@@ -72,7 +38,7 @@ __cobalt_spark_git_ref_budget() {
   cwd_prompt=${cwd_prompt//\%\%/%}
   # Wrapped cwd text only occupies its final line when budgeting the Git ref.
   cwd_end_column=$(( (prompt_status_width + prompt_segment_spacing +
-    (SHLVL > 1 ? ${#SHLVL} + 3 : 0) + ${#cwd_prompt}) % COLUMNS ))
+    ${#cwd_prompt}) % COLUMNS ))
   # Color escapes take no space; detached refs also have an @ prefix.
   REPLY=$(( COLUMNS - cwd_end_column - ${#prompt_sign} -
     prompt_segment_spacing - git_segment_braces_width -
@@ -441,14 +407,13 @@ ZSH_THEME_GIT_PROMPT_SUFFIX="%F{blue})%f"
 ZSH_THEME_GIT_PROMPT_DIRTY="%F{152}*%F{109}"
 ZSH_THEME_GIT_PROMPT_CLEAN=""
 
-# U+FE0E requests text presentation so iTerm does not reserve an emoji cell.
-typeset -g __cobalt_spark_default_prompt_sign=$' \u26A1\uFE0E'
-# GNU Screen may suppress the preceding glyph when handling U+FE0E.
-[[ -n ${STY:-} ]] && __cobalt_spark_default_prompt_sign=$' \u26A1'
+# [Fork 定制] 双行提示符 + 闪电锚点；去掉 U+FE0E（在 Herd 里会导致输入时图标消失）
+typeset -g __cobalt_spark_default_prompt_sign=$'\n\u26A1'
 
 PROMPT='%f%k%b%u%s'
 PROMPT+='${__cobalt_spark_pipeline_color}%(?..%F{9})•'
-(( SHLVL > 1 )) && PROMPT+=' %F{244}[%F{109}$SHLVL%F{244}]'
+# [Fork 定制] 不显示 shell 层级 [n]（在 Herd 等终端里 SHLVL 常偏高，属于噪声）
+# 原版：(( SHLVL > 1 )) && PROMPT+=' %F{244}[%F{109}$SHLVL%F{244}]'
 PROMPT+=' %B%F{75}$(__cobalt_spark_pwd_prompt_info)%f%b'
 PROMPT+='$(git_prompt_info)'
 PROMPT+='%B%F{178}${${COBALT_SPARK_THEME_PROMPT_SIGN-$__cobalt_spark_default_prompt_sign}//\%/%%}%f%b'
